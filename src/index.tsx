@@ -1,16 +1,56 @@
+import { useCallback, useState } from "react";
+
 import { ActionPanel, Action, List } from "@raycast/api";
-import { useFetch, Response } from "@raycast/utils";
-import { useState } from "react";
-import { URLSearchParams } from "node:url";
+import { useStreamJSON } from "@raycast/utils";
+
+type SearchResultScheduleType = "Lecture" | "Distance Learning" | "Experiential" | "Laboratory" | "Individual Study";
+
+type SearchResult = {
+  id: string;
+  title: string;
+  subjectCode: string;
+  courseCode: string;
+  instructor: string[];
+  description: string;
+  capacity: number;
+  credits: [number] | [number, number];
+  term: string;
+  crn: number[];
+  sched: SearchResultScheduleType[];
+};
 
 export default function Command() {
   const [searchText, setSearchText] = useState("");
-  const { data, isLoading } = useFetch(
-    "https://api.npms.io/v2/search?" +
-      // send the search query to the API
-      new URLSearchParams({ q: searchText.length === 0 ? "@raycast/api" : searchText }),
+
+  const searchResultsFilter = useCallback(
+    (searchResult: SearchResult) => {
+      if (!searchText) {
+        return true;
+      }
+
+      const lowerSearchText = searchText.toLowerCase();
+      return (
+        searchResult.title.toLowerCase().includes(lowerSearchText) ||
+        searchResult.subjectCode.toLowerCase().includes(lowerSearchText) ||
+        searchResult.courseCode.toLowerCase().includes(lowerSearchText)
+      );
+    },
+    [searchText],
+  );
+
+  const searchResultsTransform = useCallback((item: SearchResult): SearchResult => {
+    return {
+      ...item,
+      id: `${item.subjectCode}${item.courseCode}`,
+    };
+  }, []);
+
+  const { data, isLoading } = useStreamJSON(
+    "https://boilerclasses.s3.us-east-2.amazonaws.com/data/classes_fall2024.json",
     {
-      parseResponse: parseFetchResponse,
+      initialData: [] as SearchResult[],
+      filter: searchResultsFilter,
+      transform: searchResultsTransform,
     },
   );
 
@@ -18,11 +58,11 @@ export default function Command() {
     <List
       isLoading={isLoading}
       onSearchTextChange={setSearchText}
-      searchBarPlaceholder="Search npm packages..."
+      searchBarPlaceholder="Search Purdue classes..."
       throttle
     >
       <List.Section title="Results" subtitle={data?.length + ""}>
-        {data?.map((searchResult) => <SearchListItem key={searchResult.name} searchResult={searchResult} />)}
+        {data?.map((searchResult, index) => <SearchListItem key={index} searchResult={searchResult} />)}
       </List.Section>
     </List>
   );
@@ -31,18 +71,21 @@ export default function Command() {
 function SearchListItem({ searchResult }: { searchResult: SearchResult }) {
   return (
     <List.Item
-      title={searchResult.name}
-      subtitle={searchResult.description}
-      accessories={[{ text: searchResult.username }]}
+      title={`${searchResult.subjectCode} ${searchResult.courseCode}`}
+      subtitle={searchResult.title}
+      // accessories={[{ text: searchResult.username }]}
       actions={
         <ActionPanel>
           <ActionPanel.Section>
-            <Action.OpenInBrowser title="Open in Browser" url={searchResult.url} />
+            <Action.OpenInBrowser
+              title="Open in Browser"
+              url={`https://www.boilerclasses.com/detail/${searchResult.subjectCode}${searchResult.courseCode}${searchResult.title.replace(/\s/g, "")}`}
+            />
           </ActionPanel.Section>
           <ActionPanel.Section>
             <Action.CopyToClipboard
-              title="Copy Install Command"
-              content={`npm install ${searchResult.name}`}
+              title="Copy Course Code"
+              content={`${searchResult.subjectCode} ${searchResult.courseCode}`}
               shortcut={{ modifiers: ["cmd"], key: "." }}
             />
           </ActionPanel.Section>
@@ -50,40 +93,4 @@ function SearchListItem({ searchResult }: { searchResult: SearchResult }) {
       }
     />
   );
-}
-
-/** Parse the response from the fetch query into something we can display */
-async function parseFetchResponse(response: Response) {
-  const json = (await response.json()) as
-    | {
-        results: {
-          package: {
-            name: string;
-            description?: string;
-            publisher?: { username: string };
-            links: { npm: string };
-          };
-        }[];
-      }
-    | { code: string; message: string };
-
-  if (!response.ok || "message" in json) {
-    throw new Error("message" in json ? json.message : response.statusText);
-  }
-
-  return json.results.map((result) => {
-    return {
-      name: result.package.name,
-      description: result.package.description,
-      username: result.package.publisher?.username,
-      url: result.package.links.npm,
-    } as SearchResult;
-  });
-}
-
-interface SearchResult {
-  name: string;
-  description?: string;
-  username?: string;
-  url: string;
 }

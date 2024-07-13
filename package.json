@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "purdue-class-search",
-  "title": "Purdue Class Search",
-  "description": "Search for classes available at Purdue.",
+  "name": "purdue-course-search",
+  "title": "Purdue Course Search",
+  "description": "Search for courses available at Purdue University (Updated Fall 2024).",
   "icon": "command-icon.png",
   "author": "rayhanadev",
   "categories": [
@@ -12,8 +12,9 @@
   "commands": [
     {
       "name": "index",
-      "title": "Search Purdue Classes",
-      "description": "Search for classes available at Purdue.",
+      "title": "Search Courses",
+      "description": "Search the Purdue Course Directory for a specific course.",
+      "subtitle": "Purdue",
       "mode": "view"
     }
   ],
